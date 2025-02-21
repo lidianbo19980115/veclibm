@@ -56,10 +56,36 @@ jobs:
           path: sysroot
           key: sysroot-${{ hashFiles('./.github/workflows/build_and_test.yml') }}
 
+      # - name: Create sysroot
+      #   run: |
+      #     sudo debootstrap --arch=riscv64 --verbose --include=fakeroot,symlinks,googletest --resolve-deps --variant=minbase --components=main,universe jammy sysroot
+      #     # Remove unused files to minimize cache
+      #     sudo chroot sysroot symlinks -cr .
+      #     sudo chown ${USER} -R sysroot
+      #     rm -rf sysroot/{dev,proc,run,sys,var}
+      #     rm -rf sysroot/usr/{sbin,bin,share}
+      #     rm -rf sysroot/usr/lib/{apt,gcc,udev,systemd}
+      #     rm -rf sysroot/usr/libexec/gcc
+      #   if: steps.check-sysroot-cache.outputs.cache-hit != 'true'
+      
+
       - name: Create sysroot
         run: |
-          sudo debootstrap --arch=riscv64 --verbose --include=fakeroot,symlinks,googletest --resolve-deps --variant=minbase --components=main,universe jammy sysroot
-          # Remove unused files to minimize cache
+          # 使用 noble (24.04) 替代 jammy (22.04)
+          sudo debootstrap --arch=riscv64 --verbose \
+            --include=fakeroot,symlinks,googletest,libc6-dev \
+            --resolve-deps --variant=minbase \
+            --components=main,universe \
+            noble sysroot http://ports.ubuntu.com/ubuntu-ports
+      
+          echo "deb http://ports.ubuntu.com/ubuntu-ports noble main universe" | sudo tee sysroot/etc/apt/sources.list
+          echo "deb http://ports.ubuntu.com/ubuntu-ports noble-updates main universe" | sudo tee -a sysroot/etc/apt/sources.list
+      
+          # 更新并安装 glibc 3.28
+          sudo chroot sysroot apt-get update -y
+          sudo chroot sysroot apt-get install -y libc6=2.39-0ubuntu8 # 确认版本号
+      
+          # 清理文件
           sudo chroot sysroot symlinks -cr .
           sudo chown ${USER} -R sysroot
           rm -rf sysroot/{dev,proc,run,sys,var}
@@ -67,7 +93,7 @@ jobs:
           rm -rf sysroot/usr/lib/{apt,gcc,udev,systemd}
           rm -rf sysroot/usr/libexec/gcc
         if: steps.check-sysroot-cache.outputs.cache-hit != 'true'
-
+        
       - name: Build
         shell: bash -ex -o pipefail {0}
         run: |
