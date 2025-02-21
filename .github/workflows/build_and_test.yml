@@ -46,7 +46,22 @@ jobs:
           chmod u+x llvm.sh
           sudo ./llvm.sh ${LLVM_VERSION}
           rm llvm.sh
-
+    # 安装正确的 glibc 版本
+      - name: Install glibc 2.38
+        run: |
+          # 下载并解压 glibc 2.38 源代码
+          wget http://ftp.gnu.org/gnu/libc/glibc-2.38.tar.gz
+          tar -xvzf glibc-2.38.tar.gz
+          cd glibc-2.38
+          mkdir build
+          cd build
+          ../configure --prefix=/opt/glibc-2.38
+          make -j$(nproc)
+          sudo make install
+          # 配置 glibc 库路径
+          sudo ldconfig /opt/glibc-2.38/lib
+          echo "/opt/glibc-2.38/lib" | sudo tee -a /etc/ld.so.conf.d/glibc-2.38.conf
+          sudo ldconfig
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v3.0.0
 
